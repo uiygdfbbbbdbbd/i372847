@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>i372847</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg:      #060812;
+    --bg-2:    #0b0f1c;
+    --surface: #11151f;
+    --border:  #1e2436;
+    --border-lit:#2a3350;
+    --text:    #e6e8ec;
+    --muted:   #8a919e;
+    --dim:     #5a6172;
+    --accent:  #64ffda;
+    --accent-2:#a78bfa;
+    --danger:  #ff6b6b;
+    --ok:      #7ee787;
+    --warn:    #f59e0b;
+    --font-ui: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { background: var(--bg); }
+  body {
+    min-height: 100vh;
+    font-family: var(--font-ui);
+    color: var(--text);
+    background:
+      radial-gradient(1000px 500px at 15% -10%, #16224066 0, transparent 60%),
+      radial-gradient(900px 500px at 100% 100%, #2a1a4a55 0, transparent 55%),
+      var(--bg);
+    background-attachment: fixed;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  /* ─── Top nav ─── */
+  .nav {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; align-items: center; gap: 24px;
+    padding: 12px 28px;
+    background: rgba(6, 8, 18, .75);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-mono);
+    font-weight: 700; font-size: 1rem; letter-spacing: .04em;
+  }
+  .brand-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+  }
+  .brand span.slash { color: var(--dim); }
+  .brand span.tag   { color: var(--accent); }
+
+  .tabs {
+    display: flex; gap: 4px;
+    margin-left: 12px;
+    padding: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .tab {
+    font: inherit; font-weight: 600; font-size: .82rem;
+    padding: 8px 16px; border-radius: 7px;
+    color: var(--muted); background: transparent;
+    border: 0; cursor: pointer;
+    letter-spacing: .02em;
+    transition: color .15s, background .15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    color: var(--bg);
+    background: var(--accent);
+  }
+  .nav-right {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 14px;
+    font-family: var(--font-mono);
+    font-size: .72rem; color: var(--dim);
+  }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: #0a0d18;
+  }
+  .status-pill::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ok);
+    box-shadow: 0 0 8px var(--ok);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 50% { opacity: .4; } }
+
+  /* ─── Pages ─── */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ─── Home / launcher ─── */
+  .hero {
+    padding: 60px 28px 40px;
+    max-width: 1200px; margin: 0 auto;
+    text-align: center;
+  }
+  .eyebrow {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: .72rem; letter-spacing: .18em;
+    color: var(--accent);
+    padding: 5px 12px;
+    border: 1px solid #64ffda44;
+    background: #64ffda0d;
+    border-radius: 999px;
+    margin-bottom: 20px;
+  }
+  h1.title {
+    margin: 0 0 14px;
+    font-size: clamp(2.2rem, 5vw, 3.6rem);
+    font-weight: 800;
+    letter-spacing: -.02em;
+    text-wrap: balance;
+    line-height: 1.05;
+  }
+  h1.title .grad {
+    background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  p.lede {
+    margin: 0 auto 36px; max-width: 620px;
+    font-size: 1.02rem; color: var(--muted);
+    line-height: 1.55;
+  }
+
+  .launchers {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    max-width: 900px; margin: 0 auto;
+  }
+  @media (max-width: 720px) {
+    .launchers { grid-template-columns: 1fr; }
+  }
+  .launcher {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px 20px;
+    text-align: left;
+    cursor: pointer;
+    color: inherit; font: inherit;
+    transition: transform .1s, border-color .15s, background .15s;
+    overflow: hidden;
+  }
+  .launcher::after {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(circle at var(--x,50%) var(--y,50%), #ffffff08, transparent 40%);
+    opacity: 0; transition: opacity .2s;
+    pointer-events: none;
+  }
+  .launcher:hover { transform: translateY(-3px); border-color: var(--border-lit); }
+  .launcher:hover::after { opacity: 1; }
+  .launcher .num {
+    font-family: var(--font-mono); font-size: .72rem;
+    color: var(--dim); letter-spacing: .1em;
+  }
+  .launcher h3 {
+    margin: 8px 0 6px;
+    font-family: var(--font-mono);
+    font-size: 1.05rem; font-weight: 700;
+    letter-spacing: -.01em;
+  }
+  .launcher p {
+    margin: 0; font-size: .82rem; color: var(--muted); line-height: 1.5;
+  }
+  .launcher .cta {
+    margin-top: 16px;
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono);
+    font-size: .78rem; font-weight: 700;
+  }
+  .launcher.about h3, .launcher.about .cta { color: #7cb2ff; }
+  .launcher.about  { border-color: #3a5cff33; }
+  .launcher.about:hover { border-color: #3a5cff88; }
+  .launcher.data  h3, .launcher.data  .cta { color: var(--ok); }
+  .launcher.data   { border-color: #22c55e33; }
+  .launcher.data:hover { border-color: #22c55e88; }
+  .launcher.blob  h3, .launcher.blob  .cta { color: var(--warn); }
+  .launcher.blob   { border-color: #f59e0b33; }
+  .launcher.blob:hover { border-color: #f59e0b88; }
+
+  #status {
+    text-align: center;
+    margin: 22px auto 0;
+    font-family: var(--font-mono);
+    font-size: .78rem; color: var(--muted); min-height: 1.2em;
+  }
+
+  /* ─── Info / About page ─── */
+  .content {
+    max-width: 900px; margin: 0 auto;
+    padding: 40px 28px;
+  }
+  .content h2 {
+    font-size: 1.6rem; margin: 0 0 8px;
+    letter-spacing: -.01em;
+  }
+  .content p { color: var(--muted); line-height: 1.65; }
+  .grid-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px; margin-top: 26px;
+  }
+  .info-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+  }
+  .info-card h4 {
+    margin: 0 0 6px; font-size: .95rem;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .info-card h4::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  }
+  .info-card p { margin: 0; font-size: .84rem; }
+
+  /* ─── Footer ─── */
+  footer {
+    padding: 28px; margin-top: 40px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: .72rem; color: var(--dim);
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    i372847<span class="slash">/</span><span class="tag">games</span>
+  </div>
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-page="home">Launch</button>
+    <button class="tab" data-page="how">How it works</button>
+    <button class="tab" data-page="about">About</button>
+  </div>
+  <div class="nav-right">
+    <span class="status-pill">online</span>
+    <span class="hide-sm">v1.0</span>
+  </div>
+</nav>
+
+<!-- HOME -->
+<section class="page active" id="page-home">
+  <div class="hero">
+    <div class="eyebrow">◇ SANDBOXED LAUNCHER</div>
+    <h1 class="title">Open the <span class="grad">game menu</span><br>in a clean tab.</h1>
+    <p class="lede">Three methods, one menu. Each opens the games page in a sandboxed context — <span style="color:var(--text);font-family:var(--font-mono);font-size:.9em">about:blank</span>, <span style="color:var(--text);font-family:var(--font-mono);font-size:.9em">data:</span>, or <span style="color:var(--text);font-family:var(--font-mono);font-size:.9em">blob:</span>. Pick whichever works on your network.</p>
+
+    <div class="launchers">
+      <button class="launcher about" data-mode="about">
+        <div class="num">01 · TAB CONTEXT</div>
+        <h3>about:blank</h3>
+        <p>Opens a new blank tab and writes the menu HTML directly into it. Most compatible.</p>
+        <div class="cta">launch →</div>
+      </button>
+      <button class="launcher data" data-mode="data">
+        <div class="num">02 · INLINE PAYLOAD</div>
+        <h3>data: URI</h3>
+        <p>Encodes the whole menu into the URL itself. No network round-trip after load.</p>
+        <div class="cta">launch →</div>
+      </button>
+      <button class="launcher blob" data-mode="blob">
+        <div class="num">03 · OBJECT URL</div>
+        <h3>blob:</h3>
+        <p>Wraps the menu in a Blob and hands the tab a fresh object URL. Most reliable.</p>
+        <div class="cta">launch →</div>
+      </button>
+    </div>
+
+    <div id="status"></div>
+  </div>
+</section>
+
+<!-- HOW -->
+<section class="page" id="page-how">
+  <div class="content">
+    <h2>How it works</h2>
+    <p>The button on this page fetches the game menu, then hands the HTML directly to a new tab in one of three ways. The tab's address bar never shows the source host — it shows <code>about:blank</code>, a <code>data:</code> URI, or a <code>blob:</code> URL — so URL-based filters and content blockers can't match on it.</p>
+    <div class="grid-info">
+      <div class="info-card">
+        <h4>about:blank</h4>
+        <p>Opens a blank tab, uses <code>document.write()</code> to inject the menu HTML. Address bar reads <code>about:blank</code>.</p>
+      </div>
+      <div class="info-card">
+        <h4>data:</h4>
+        <p>Encodes the entire menu as a <code>data:text/html</code> URL. Some browsers restrict this at the top level.</p>
+      </div>
+      <div class="info-card">
+        <h4>blob:</h4>
+        <p>Creates a Blob and gets an object URL tied to this origin. Reliable across most modern browsers.</p>
+      </div>
+      <div class="info-card">
+        <h4>Add a game</h4>
+        <p>Drop a <code>name.html</code> file in the repo. The menu auto-detects it via the GitHub API — no code changes needed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section class="page" id="page-about">
+  <div class="content">
+    <h2>About</h2>
+    <p>A self-hosted, no-database directory of standalone HTML games. Each game is a single self-contained file — no CDNs, no trackers, no accounts. Files live in a public GitHub repo and are served through GitHub Pages.</p>
+    <p style="margin-top:20px">Source: <a href="https://github.com/uiygdfbbbbdbbd/i372847" target="_blank" style="color:var(--accent);border-bottom:1px solid var(--accent)">github.com/uiygdfbbbbdbbd/i372847</a></p>
+  </div>
+</section>
+
+<footer>uiygdfbbbbdbbd / i372847 · built with html + a lot of stubbornness</footer>
+
+<script>
+  // ── Tabs
+  var tabs = document.querySelectorAll('.tab');
+  var pages = document.querySelectorAll('.page');
+  tabs.forEach(function(t){
+    t.onclick = function(){
+      tabs.forEach(function(x){ x.classList.remove('active'); });
+      pages.forEach(function(x){ x.classList.remove('active'); });
+      t.classList.add('active');
+      document.getElementById('page-' + t.dataset.page).classList.add('active');
+    };
+  });
+
+  // ── Launcher hover glow
+  document.querySelectorAll('.launcher').forEach(function(el){
+    el.addEventListener('mousemove', function(e){
+      var r = el.getBoundingClientRect();
+      el.style.setProperty('--x', (e.clientX - r.left) + 'px');
+      el.style.setProperty('--y', (e.clientY - r.top) + 'px');
+    });
+  });
+
+  // ── Launch logic (same as before)
+  var MENU_URL = 'https://uiygdfbbbbdbbd.github.io/i372847/games.html';
+  var status = document.getElementById('status');
+  function note(m){ status.textContent = m; }
+
+  async function fetchMenu(){
+    var r = await fetch(MENU_URL, { cache: 'no-store' });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.text();
+  }
+
+  async function launch(mode){
+    if(mode === 'about'){
+      var w = window.open('about:blank', '_blank');
+      if(!w){ note('Popup blocked — allow popups for this site.'); return; }
+      w.document.write('<p style="font:14px system-ui;color:#888;padding:20px">Loading menu...</p>');
+      try {
+        var html = await fetchMenu();
+        w.document.open(); w.document.write(html); w.document.close();
+        note('◇ opened menu in about:blank');
+      } catch(e){ w.document.body.innerText = 'Failed: ' + e.message; note('failed · ' + e.message); }
+      return;
+    }
+    try {
+      var html = await fetchMenu();
+      if(mode === 'data'){
+        window.open('data:text/html;charset=utf-8,' + encodeURIComponent(html), '_blank');
+        note('◇ opened menu as data:');
+      } else if(mode === 'blob'){
+        var url = URL.createObjectURL(new Blob([html], {type:'text/html'}));
+        window.open(url, '_blank');
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+        note('◇ opened menu as blob:');
+      }
+    } catch(e){ note('failed · ' + e.message); }
+  }
+
+  document.querySelectorAll('.launcher[data-mode]').forEach(function(b){
+    b.onclick = function(){ launch(b.dataset.mode); };
+  });
+</script>
+</body>
+</html>
