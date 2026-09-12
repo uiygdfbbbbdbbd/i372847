@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Games</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: #0a0d14;
+    background-image:
+      radial-gradient(circle at 10% 10%, #1b2740 0, transparent 40%),
+      radial-gradient(circle at 90% 90%, #24123a 0, transparent 40%);
+    color: #e6e8ec;
+    padding: 28px 24px 40px;
+  }
+  header {
+    max-width: 1100px; margin: 0 auto 24px;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+    flex-wrap: wrap;
+  }
+  h1 {
+    margin: 0; font-size: 1.6rem; font-weight: 700;
+    letter-spacing: .12em; text-transform: uppercase;
+  }
+  h1 span { color: #7ee787; }
+  .meta { font-size: .8rem; color: #7a8090; }
+  .grid {
+    max-width: 1100px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+  }
+  .game {
+    background: #141824;
+    border: 1px solid #232a3a;
+    border-radius: 14px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    transition: border-color .15s, transform .1s;
+  }
+  .game:hover { border-color: #3a5cff88; transform: translateY(-2px); }
+  .thumb {
+    aspect-ratio: 16 / 10;
+    background: #0b0f18 center / cover no-repeat;
+    display: grid; place-items: center;
+    font-size: 2.6rem;
+    border-bottom: 1px solid #232a3a;
+  }
+  .body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .body strong { font-size: 1.02rem; }
+  .body p { margin: 0; font-size: .82rem; color: #8a919e; line-height: 1.45; flex: 1; }
+  .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  button {
+    font: inherit; font-size: .75rem; font-weight: 600;
+    padding: 6px 10px; border-radius: 6px;
+    border: 1px solid #2a2f3a; background: #1e2330; color: #e6e8ec;
+    cursor: pointer;
+  }
+  button:hover { background: #262d3d; }
+  button.about { border-color: #3a5cff55; }
+  button.blob  { border-color: #f59e0b55; }
+  button.data  { border-color: #22c55e55; }
+  #status { max-width: 1100px; margin: 14px auto 0; font-size: .78rem; color: #8a919e; min-height: 1.2em; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Game <span>Menu</span></h1>
+    <div class="meta">Click a launch method — the game opens in a sandboxed tab.</div>
+  </header>
+  <div class="grid" id="grid"></div>
+  <div id="status"></div>
+
+<script>
+  // Where the game files live. This page fetches them and hands them
+  // straight to the tab as about:blank / data: / blob:, so the URL bar
+  // never shows the host.
+  var BASE = 'https://uiygdfbbbbdbbd.github.io/i372847';
+
+  // Just list filenames. Each foo.html can have an optional foo.info
+  // next to it: { "name": "...", "description": "...", "image": "..." }
+  var FILES = [
+    'snake.html',
+    // 'tetris.html',
+    // '2048.html',
+  ];
+
+  var status = document.getElementById('status');
+  function note(m){ status.textContent = m; }
+  function baseName(f){ return f.replace(/\.[^.]+$/, ''); }
+  function joinUrl(a, b){ return a.replace(/\/$/, '') + '/' + b.replace(/^\//, ''); }
+
+  async function loadInfo(file){
+    try {
+      var r = await fetch(joinUrl(BASE, baseName(file) + '.info'), { cache: 'no-store' });
+      if(!r.ok) return {};
+      return await r.json();
+    } catch(e){ return {}; }
+  }
+
+  async function loadHtml(file){
+    var r = await fetch(joinUrl(BASE, file), { cache: 'no-store' });
+    if(!r.ok) throw new Error('HTTP ' + r.status + ' for ' + file);
+    return await r.text();
+  }
+
+  async function openAbout(file){
+    var w = window.open('about:blank', '_blank');
+    if(!w){ note('Popup blocked'); return; }
+    w.document.write('<p style="font:14px system-ui;color:#888;padding:20px">Loading...</p>');
+    try {
+      var html = await loadHtml(file);
+      w.document.open(); w.document.write(html); w.document.close();
+      note('Opened ' + file + ' in about:blank');
+    } catch(e){ w.document.body.innerText = 'Failed: ' + e.message; note(e.message); }
+  }
+
+  async function openBlob(file){
+    try {
+      var html = await loadHtml(file);
+      var url = URL.createObjectURL(new Blob([html], {type:'text/html'}));
+      window.open(url, '_blank');
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+      note('Opened ' + file + ' as blob:');
+    } catch(e){ note('Failed: ' + e.message); }
+  }
+
+  async function openData(file){
+    try {
+      var html = await loadHtml(file);
+      window.open('data:text/html;charset=utf-8,' + encodeURIComponent(html), '_blank');
+      note('Opened ' + file + ' as data:');
+    } catch(e){ note('Failed: ' + e.message); }
+  }
+
+  function iconFor(name){
+    var n = name.toLowerCase();
+    if(n.indexOf('snake') >= 0) return '🐍';
+    if(n.indexOf('tetris') >= 0) return '🧱';
+    if(n.indexOf('2048') >= 0) return '🔢';
+    if(n.indexOf('flappy') >= 0) return '🐤';
+    if(n.indexOf('pong') >= 0) return '🏓';
+    if(n.indexOf('breakout') >= 0) return '🧊';
+    if(n.indexOf('minesweeper') >= 0) return '💣';
+    return '🎮';
+  }
+
+  var grid = document.getElementById('grid');
+
+  (async function build(){
+    for(var i=0;i<FILES.length;i++){
+      var file = FILES[i];
+      var card = document.createElement('div');
+      card.className = 'game';
+      card.innerHTML =
+        '<div class="thumb"></div>' +
+        '<div class="body">' +
+          '<strong></strong>' +
+          '<p></p>' +
+          '<div class="btns">' +
+            '<button class="about">about:blank</button>' +
+            '<button class="blob">blob:</button>' +
+            '<button class="data">data:</button>' +
+          '</div>' +
+        '</div>';
+      grid.appendChild(card);
+
+      var thumb  = card.querySelector('.thumb');
+      var nameEl = card.querySelector('strong');
+      var descEl = card.querySelector('p');
+
+      // Defaults so the card is usable even without a .info file
+      var fallbackName = baseName(file).replace(/[-_]+/g,' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+      nameEl.textContent = fallbackName;
+      descEl.textContent = '';
+      thumb.textContent = iconFor(fallbackName);
+
+      (function(file, thumb, nameEl, descEl){
+        loadInfo(file).then(function(info){
+          if(info.name) nameEl.textContent = info.name;
+          if(info.description) descEl.textContent = info.description;
+          if(info.image){
+            var imgUrl = /^https?:\/\//.test(info.image) ? info.image : joinUrl(BASE, info.image);
+            thumb.style.backgroundImage = 'url("' + imgUrl.replace(/"/g,'') + '")';
+            thumb.textContent = '';
+          }
+        });
+      })(file, thumb, nameEl, descEl);
+
+      (function(file){
+        card.querySelector('.about').onclick = function(){ openAbout(file); };
+        card.querySelector('.blob').onclick  = function(){ openBlob(file); };
+        card.querySelector('.data').onclick  = function(){ openData(file); };
+      })(file);
+    }
+  })();
+</script>
+</body>
+</html>
