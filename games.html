@@ -65,45 +65,55 @@
   button.blob  { border-color: #f59e0b55; }
   button.data  { border-color: #22c55e55; }
   #status { max-width: 1100px; margin: 14px auto 0; font-size: .78rem; color: #8a919e; min-height: 1.2em; }
+  .skel {
+    max-width: 1100px; margin: 0 auto; font-size: .9rem; color: #6b7180;
+  }
 </style>
 </head>
 <body>
   <header>
     <h1>Game <span>Menu</span></h1>
-    <div class="meta">Click a launch method — the game opens in a sandboxed tab.</div>
+    <div class="meta">Auto-loaded from GitHub. Drop a new .html in the repo and it appears here.</div>
   </header>
+  <div class="skel" id="skel">Scanning repo...</div>
   <div class="grid" id="grid"></div>
   <div id="status"></div>
 
 <script>
-  // Where the game files live. This page fetches them and hands them
-  // straight to the tab as about:blank / data: / blob:, so the URL bar
-  // never shows the host.
-  var BASE = 'https://uiygdfbbbbdbbd.github.io/i372847';
+  // Repo config
+  var OWNER = 'uiygdfbbbbdbbd';
+  var REPO  = 'i372847';
+  var BRANCH = 'main';
+  var PAGES_BASE = 'https://' + OWNER + '.github.io/' + REPO;
 
-  // Just list filenames. Each foo.html can have an optional foo.info
-  // next to it: { "name": "...", "description": "...", "image": "..." }
-  var FILES = [
-    'snake.html',
-    // 'tetris.html',
-    // '2048.html',
-  ];
+  // Files to hide from the auto-list even if they end in .html
+  var IGNORE = ['games.html', 'index.html'];
 
   var status = document.getElementById('status');
+  var skel   = document.getElementById('skel');
+  var grid   = document.getElementById('grid');
   function note(m){ status.textContent = m; }
   function baseName(f){ return f.replace(/\.[^.]+$/, ''); }
   function joinUrl(a, b){ return a.replace(/\/$/, '') + '/' + b.replace(/^\//, ''); }
 
+  // Ask the GitHub API for the file listing (public, no auth needed).
+  // Rate limit is 60/hr per IP unauthenticated — plenty for a menu.
+  async function listRepoFiles(){
+    var url = 'https://api.github.com/repos/' + OWNER + '/' + REPO + '/contents?ref=' + BRANCH;
+    var r = await fetch(url, { cache: 'no-store' });
+    if(!r.ok) throw new Error('GitHub API HTTP ' + r.status);
+    return await r.json(); // array of { name, type, ... }
+  }
+
   async function loadInfo(file){
     try {
-      var r = await fetch(joinUrl(BASE, baseName(file) + '.info'), { cache: 'no-store' });
+      var r = await fetch(joinUrl(PAGES_BASE, baseName(file) + '.info'), { cache: 'no-store' });
       if(!r.ok) return {};
       return await r.json();
     } catch(e){ return {}; }
   }
-
   async function loadHtml(file){
-    var r = await fetch(joinUrl(BASE, file), { cache: 'no-store' });
+    var r = await fetch(joinUrl(PAGES_BASE, file), { cache: 'no-store' });
     if(!r.ok) throw new Error('HTTP ' + r.status + ' for ' + file);
     return await r.text();
   }
@@ -118,7 +128,6 @@
       note('Opened ' + file + ' in about:blank');
     } catch(e){ w.document.body.innerText = 'Failed: ' + e.message; note(e.message); }
   }
-
   async function openBlob(file){
     try {
       var html = await loadHtml(file);
@@ -128,7 +137,6 @@
       note('Opened ' + file + ' as blob:');
     } catch(e){ note('Failed: ' + e.message); }
   }
-
   async function openData(file){
     try {
       var html = await loadHtml(file);
@@ -146,56 +154,70 @@
     if(n.indexOf('pong') >= 0) return '🏓';
     if(n.indexOf('breakout') >= 0) return '🧊';
     if(n.indexOf('minesweeper') >= 0) return '💣';
+    if(n.indexOf('chess') >= 0) return '♟';
+    if(n.indexOf('pac') >= 0) return '👻';
+    if(n.indexOf('doom') >= 0) return '👹';
     return '🎮';
   }
 
-  var grid = document.getElementById('grid');
+  function makeCard(file){
+    var card = document.createElement('div');
+    card.className = 'game';
+    card.innerHTML =
+      '<div class="thumb"></div>' +
+      '<div class="body">' +
+        '<strong></strong>' +
+        '<p></p>' +
+        '<div class="btns">' +
+          '<button class="about">about:blank</button>' +
+          '<button class="blob">blob:</button>' +
+          '<button class="data">data:</button>' +
+        '</div>' +
+      '</div>';
+    grid.appendChild(card);
+
+    var thumb  = card.querySelector('.thumb');
+    var nameEl = card.querySelector('strong');
+    var descEl = card.querySelector('p');
+
+    var fallbackName = baseName(file).replace(/[-_]+/g,' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+    nameEl.textContent = fallbackName;
+    thumb.textContent = iconFor(fallbackName);
+
+    loadInfo(file).then(function(info){
+      if(info.name) nameEl.textContent = info.name;
+      if(info.description) descEl.textContent = info.description;
+      if(info.image){
+        var imgUrl = /^https?:\/\//.test(info.image) ? info.image : joinUrl(PAGES_BASE, info.image);
+        thumb.style.backgroundImage = 'url("' + imgUrl.replace(/"/g,'') + '")';
+        thumb.textContent = '';
+      }
+    });
+
+    card.querySelector('.about').onclick = function(){ openAbout(file); };
+    card.querySelector('.blob').onclick  = function(){ openBlob(file); };
+    card.querySelector('.data').onclick  = function(){ openData(file); };
+  }
 
   (async function build(){
-    for(var i=0;i<FILES.length;i++){
-      var file = FILES[i];
-      var card = document.createElement('div');
-      card.className = 'game';
-      card.innerHTML =
-        '<div class="thumb"></div>' +
-        '<div class="body">' +
-          '<strong></strong>' +
-          '<p></p>' +
-          '<div class="btns">' +
-            '<button class="about">about:blank</button>' +
-            '<button class="blob">blob:</button>' +
-            '<button class="data">data:</button>' +
-          '</div>' +
-        '</div>';
-      grid.appendChild(card);
+    try {
+      var files = await listRepoFiles();
+      var games = files
+        .filter(function(f){ return f.type === 'file' && /\.html?$/i.test(f.name); })
+        .filter(function(f){ return IGNORE.indexOf(f.name.toLowerCase()) < 0; })
+        .map(function(f){ return f.name; })
+        .sort();
 
-      var thumb  = card.querySelector('.thumb');
-      var nameEl = card.querySelector('strong');
-      var descEl = card.querySelector('p');
+      skel.remove();
 
-      // Defaults so the card is usable even without a .info file
-      var fallbackName = baseName(file).replace(/[-_]+/g,' ').replace(/\b\w/g, function(c){ return c.toUpperCase(); });
-      nameEl.textContent = fallbackName;
-      descEl.textContent = '';
-      thumb.textContent = iconFor(fallbackName);
-
-      (function(file, thumb, nameEl, descEl){
-        loadInfo(file).then(function(info){
-          if(info.name) nameEl.textContent = info.name;
-          if(info.description) descEl.textContent = info.description;
-          if(info.image){
-            var imgUrl = /^https?:\/\//.test(info.image) ? info.image : joinUrl(BASE, info.image);
-            thumb.style.backgroundImage = 'url("' + imgUrl.replace(/"/g,'') + '")';
-            thumb.textContent = '';
-          }
-        });
-      })(file, thumb, nameEl, descEl);
-
-      (function(file){
-        card.querySelector('.about').onclick = function(){ openAbout(file); };
-        card.querySelector('.blob').onclick  = function(){ openBlob(file); };
-        card.querySelector('.data').onclick  = function(){ openData(file); };
-      })(file);
+      if(!games.length){
+        note('No games found in the repo.');
+        return;
+      }
+      for(var i=0;i<games.length;i++) makeCard(games[i]);
+      note('Loaded ' + games.length + ' game' + (games.length===1?'':'s'));
+    } catch(e){
+      skel.textContent = 'Could not read repo: ' + e.message;
     }
   })();
 </script>
