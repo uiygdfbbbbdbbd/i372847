@@ -1,0 +1,5 @@
+{
+  "name": "Snake",
+  "description": "Classic snake — eat apples, dodge yourself. Arrow keys or WASD.",
+  "image": "snake.png"
+}
