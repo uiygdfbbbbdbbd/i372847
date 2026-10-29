@@ -1,0 +1,5 @@
+{
+  "name": "Neural Traffic",
+  "description": "A 3D city where every car is driven by a neural network that sees through range-finder rays and reads traffic lights. Crank up the chaos and watch them crash, drive your own car, give the network orders, or drop cars in a sandbox.",
+  "image": "NeuralTraffic.png"
+}
