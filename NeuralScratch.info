@@ -1,0 +1,1 @@
+{ "name": "NeuralScratch", "description": "Build, train and watch neural networks think. Snap Scratch-style blocks together (loops, if/else, math, variables, training controls), train on images, text, audio or tables, and explore a live 3D visualiser with glowing neurons, signal traces and backprop flow.", "image": "NeuralScratch.png" }
