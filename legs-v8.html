@@ -1,0 +1,542 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Legs</title>
+<style>
+  body{margin:0;background:#111;color:#fff;font:15px sans-serif;text-align:center}
+  #wrap{position:relative;width:1000px;margin:0 auto}
+  canvas{display:block;background:#1a1a2e}
+  #msg{margin:8px 8px 2px}
+  #time{margin:2px 8px 8px;font:bold 20px monospace;color:#ffd24a}
+  b{color:#fa4}
+
+  #menu{position:absolute;left:0;top:0;width:1000px;height:500px;background:rgba(10,10,30,.9);
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+  #menu h1{margin:0 0 6px;font-size:64px;letter-spacing:6px;color:#fa4;text-shadow:0 4px 0 #6a3410}
+  #menu h2{margin:0 0 8px;font-size:30px;color:#ffd24a}
+  #menu p{margin:0;color:#aab;max-width:640px}
+  button{font:bold 18px sans-serif;color:#fff;background:#33345a;border:2px solid #55578a;border-radius:8px;
+         padding:10px 22px;cursor:pointer}
+  button:hover{background:#44467a}
+  button.big{min-width:240px;font-size:22px;padding:12px 22px}
+  button.on{background:#fa4;color:#111;border-color:#fa4}
+  .row{display:flex;gap:8px;align-items:center;justify-content:center}
+  .row span{width:170px;text-align:right;color:#ccd}
+  .grid{display:grid;grid-template-columns:repeat(3,230px);gap:12px;margin:6px 0}
+  .card{text-align:left;padding:12px 14px;font-size:15px;font-weight:normal;line-height:1.35}
+  .card b{display:block;font-size:19px;color:#ffd24a}
+  .card small{color:#9ab}
+</style>
+</head>
+<body>
+<div id="msg"><b>Left leg</b> W/S lift-lower, A/D swing &nbsp;|&nbsp; <b>Right leg</b> Up/Down lift-lower, Left/Right swing &nbsp;|&nbsp; <b>Q/E</b> lean (<b>, .</b> for player 2) &nbsp;|&nbsp; <b>R</b> checkpoint &nbsp;|&nbsp; <b>Esc</b> menu</div>
+<div id="time">0.00s</div>
+<div id="wrap">
+  <canvas id="c" width="1000" height="500"></canvas>
+  <div id="menu"></div>
+</div>
+<script>
+const c=document.getElementById('c'), g=c.getContext('2d');
+const timeEl=document.getElementById('time');
+const menuEl=document.getElementById('menu');
+
+// ---------- tuning (difficulty-dependent values are `let` and set from Settings) ----------
+const START=60, L=150, MINLEN=30;
+const LIFT=2.2, ROT=0.04, MAXA=1.35, MAXW=1.5, LEAN=0.025, MAXT=1.4;
+const GRAVITY=0.6;
+let TIP=0.006, COM_PULL=0.0006, SUPPORT=85, SWING_REACT=0.05, FALL_T=1.2;
+const LAVA_Y=520;
+const ROPE=260;
+const FALL_FRAMES=100;     // how long the bot lies there before getting up
+let DX=22, DY=-26;         // 2.5D: how far "back" the top/side of blocks go (0 = flat)
+
+// ---------- levels ----------
+// ice = slippery, crumble = falls away ~1.2s after you step on it. All levels start at x=0.
+const LEVELS=[
+  { name:'First Steps', desc:'Wide ledges, short gaps. Learn to walk.', goal:1800,
+    platforms:[
+      {x1:-300,x2:500, y:400},
+      {x1:570, x2:800, y:400},
+      {x1:870, x2:1100,y:390},
+      {x1:1170,x2:1400,y:380},
+      {x1:1470,x2:1950,y:380}
+  ]},
+  { name:'Frozen Lake', desc:'Everything is ice. Stopping is a skill.', goal:2100,
+    platforms:[
+      {x1:-300,x2:420, y:400},
+      {x1:500, x2:760, y:400,ice:true},
+      {x1:840, x2:1100,y:390,ice:true},
+      {x1:1180,x2:1290,y:390},
+      {x1:1370,x2:1710,y:380,ice:true},
+      {x1:1790,x2:2300,y:380}
+  ]},
+  { name:'Crumble Canyon', desc:"Don't stand still. The floor is leaving.", goal:2100,
+    platforms:[
+      {x1:-300,x2:420, y:400},
+      {x1:500, x2:650, y:400,crumble:true},
+      {x1:730, x2:880, y:390,crumble:true},
+      {x1:960, x2:1110,y:380,crumble:true},
+      {x1:1190,x2:1300,y:380},
+      {x1:1380,x2:1500,y:370,crumble:true},
+      {x1:1580,x2:1700,y:360,crumble:true},
+      {x1:1780,x2:2300,y:360}
+  ]},
+  { name:'Staircase', desc:'Up, up, up, then all the way back down.', goal:2400,
+    platforms:[
+      {x1:-300,x2:420, y:400},
+      {x1:510, x2:650, y:370},
+      {x1:740, x2:880, y:340},
+      {x1:970, x2:1110,y:310},
+      {x1:1200,x2:1340,y:280},
+      {x1:1430,x2:1570,y:310},
+      {x1:1660,x2:1800,y:340},
+      {x1:1890,x2:2030,y:370},
+      {x1:2120,x2:2600,y:400}
+  ]},
+  { name:'The Gauntlet', desc:'Ice, crumbling ledges, narrow beams. Good luck.', goal:2750,
+    platforms:[
+      {x1:-300,x2:430, y:400},
+      {x1:520, x2:620, y:400},
+      {x1:710, x2:930, y:370,ice:true},
+      {x1:1020,x2:1120,y:340},
+      {x1:1200,x2:1430,y:400,crumble:true},
+      {x1:1530,x2:1610,y:360},
+      {x1:1700,x2:1930,y:330,ice:true},
+      {x1:2020,x2:2120,y:330,crumble:true},
+      {x1:2210,x2:2320,y:380},
+      {x1:2420,x2:2850,y:400,ice:true}
+  ]}
+];
+
+let platforms=[], GOAL=0;
+function resetPlatforms(){for(const p of platforms){p.gone=false;p.timer=null;}}
+function platAt(x){
+  for(const p of platforms) if(!p.gone && x>=p.x1 && x<=p.x2) return p;
+  return null;
+}
+function groundAt(x){const p=platAt(x); return p?p.y:null;}
+function iceAt(x){const p=platAt(x); return !!(p&&p.ice);}
+
+// ---------- settings & records ----------
+const DIFF={
+  easy:  {TIP:0.004,COM_PULL:0.0004,SUPPORT:100,SWING_REACT:0.03,FALL_T:1.35},
+  normal:{TIP:0.006,COM_PULL:0.0006,SUPPORT:85, SWING_REACT:0.05,FALL_T:1.2},
+  hard:  {TIP:0.012,COM_PULL:0.0012,SUPPORT:65, SWING_REACT:0.10,FALL_T:1.0}
+};
+function load(key,def){try{return Object.assign(def,JSON.parse(localStorage.getItem(key)||'{}'));}catch(e){return def;}}
+const settings=load('legsSettings',{diff:'normal',bot:true,depth:true,hints:true});
+const bests=load('legsBests',{});
+let botOn=true;
+function applySettings(){
+  const d=DIFF[settings.diff]||DIFF.normal;
+  TIP=d.TIP; COM_PULL=d.COM_PULL; SUPPORT=d.SUPPORT; SWING_REACT=d.SWING_REACT; FALL_T=d.FALL_T;
+  botOn=!!settings.bot;
+  DX=settings.depth?22:0; DY=settings.depth?-26:0;
+  document.getElementById('msg').style.display=settings.hints?'':'none';
+  try{localStorage.setItem('legsSettings',JSON.stringify(settings));}catch(e){}
+}
+
+// ---------- bot brain: tiny neural net (hand-set weights, not trained) ----------
+// inputs x = [myFootPlanted, otherFootPlanted, (otherAngle - myAngle), myAngle, goFlag, tieBreak]
+// 4 step-neurons -> [lift, swingForward, lower, pushBack]
+//            pi    pj    dA    ai    go   tie    bias
+const W1=[
+  [  30,   30,    5,    0,   30,    5,  -89.9],
+  [-100,    0,    0,  -30,  100,    0,  -72.9],
+  [-100,    0,    0,   30,  100,    0, -126.9],
+  [ 100, -100,    0,    0,  100,    0, -199.9]
+];
+const stepFn=v=>v>0?1:0;
+function brain(x){
+  return W1.map(row=>{
+    let s=row[6];
+    for(let i=0;i<6;i++) s+=row[i]*x[i];
+    return stepFn(s);
+  });
+}
+
+// ---------- walkers ----------
+function makeWalker(isBot,color){
+  const w={isBot,color,hx:0,hy:300,vx:0,vy:0,t:0,cp:{x:0,y:400},legs:null,go:0,fallen:false,fallTimer:0};
+  respawn(w);
+  return w;
+}
+function respawn(w){
+  w.hx=w.cp.x; w.hy=w.cp.y-100; w.vx=0; w.vy=0; w.t=0; w.fallen=false;
+  w.legs=[
+    {idx:0,off:-8,a:0,len:START,planted:false,fx:0},
+    {idx:1,off:8, a:0,len:START,planted:false,fx:0}
+  ];
+  if(!w.isBot) resetPlatforms();
+}
+const ang  =(w,l)=>l.a+w.t;
+const hipX =(w,l)=>w.hx+l.off*Math.cos(w.t);
+const hipY =(w,l)=>w.hy+l.off*Math.sin(w.t);
+const footX=(w,l)=>hipX(w,l)+l.len*Math.sin(ang(w,l));
+const footY=(w,l)=>hipY(w,l)+l.len*Math.cos(ang(w,l));
+
+const player=makeWalker(false,'#4af');
+const bot=makeWalker(true,'#f66');
+let camY=300;
+
+// ---------- game state ----------
+let screen='main';          // 'main' | 'levels' | 'settings' | 'play' | 'win'
+let lvl=0, inProgress=false;
+let started=false, won=false, startTime=0, finalTime=0, pausedAt=0;
+const keys={};
+
+function loadLevel(i){
+  lvl=i;
+  platforms=LEVELS[i].platforms.map(p=>({...p,gone:false,timer:null}));
+  GOAL=LEVELS[i].goal;
+  player.cp={x:0,y:400}; bot.cp={x:-60,y:400}; bot.go=0;
+  respawn(player); respawn(bot);
+  camY=player.hy;
+  started=false; won=false; finalTime=0;
+  for(const k in keys) keys[k]=false;
+}
+
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(e.key==='Escape'){
+    if(screen==='play') openMenu('main');
+    else if(screen==='main' && inProgress) resume();
+    else if(screen==='levels'||screen==='settings') showPage('main');
+    return;
+  }
+  if(screen!=='play') return;
+  keys[k]=true;
+  if(e.key.startsWith('Arrow')) e.preventDefault();
+  if(k==='r') respawn(player);
+  if(!started && (('wasdqe,.').includes(k)||e.key.startsWith('Arrow'))){
+    started=true; startTime=performance.now();
+  }
+});
+addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+
+function readInput(w,l){
+  if(!w.isBot){
+    const m=l.idx===0
+      ?{fwd:'a',back:'d',up:'w',down:'s'}
+      :{fwd:'arrowleft',back:'arrowright',up:'arrowup',down:'arrowdown'};
+    return {up:keys[m.up],fwd:keys[m.fwd],down:keys[m.down],back:keys[m.back]};
+  }
+  const o=w.legs[1-l.idx];
+  const x=[l.planted?1:0, o.planted?1:0, o.a-l.a, l.a, w.go, l.idx===0?0.05:-0.05];
+  const [up,fwd,down,back]=brain(x);
+  return {up,fwd,down,back};
+}
+
+function stepWalker(w){
+  // fallen: no control. The player stays down until R. The bot gets back up on its own.
+  if(w.fallen){
+    w.fallTimer--;
+    w.vy+=GRAVITY; w.hy+=w.vy; w.hx+=w.vx; w.vx*=0.9;
+    const G=groundAt(w.hx);
+    if(G!==null && w.hy>=G-14){w.hy=G-14; w.vy=0;}
+    w.t+=(Math.sign(w.t||1)*1.5-w.t)*0.15;
+    for(const l of w.legs) l.planted=false;
+    if(w.hy>LAVA_Y){respawn(w); return;}
+    if(w.isBot && w.fallTimer<=0 && G!==null){
+      w.t=0; w.fallen=false; w.vx=0; w.vy=0; w.hy=G-100;
+      w.legs.forEach(l=>{l.a=0; l.len=START;});
+    }
+    return;
+  }
+
+  if(w.isBot){
+    const gap=player.hx-w.hx;
+    if(gap>90) w.go=1; else if(gap<40) w.go=0;
+  } else {
+    // two-people-one-body: player 1 leans with Q/E, player 2 leans with , and .
+    if(keys['q']||keys[',']) w.t=Math.max(-MAXT,w.t-LEAN);
+    if(keys['e']||keys['.']) w.t=Math.min(MAXT,w.t+LEAN);
+  }
+
+  let swung=0;
+  for(const l of w.legs){
+    const k=readInput(w,l), before=l.a;
+    if(k.fwd)  l.a=Math.min(MAXA,l.a+ROT);
+    if(k.back) l.a=Math.max(-MAXA,l.a-ROT);
+    if(k.up)   l.len=Math.max(MINLEN,l.len-LIFT);
+    if(k.down) l.len=Math.min(L,l.len+LIFT);
+    swung+=l.a-before;
+  }
+
+  // --- real gravity on your body (player only; the bot has a built-in gyro) ---
+  if(!w.isBot){
+    w.t-=swung*SWING_REACT;
+    const pl=w.legs.filter(l=>l.planted);
+    if(pl.length){
+      const xs=pl.map(l=>footX(w,l));
+      const lo=Math.min(...xs)-SUPPORT, hi=Math.max(...xs)+SUPPORT;
+      const com=w.hx+45*Math.sin(w.t);
+      let over=0; if(com<lo) over=com-lo; else if(com>hi) over=com-hi;
+      w.t+=Math.sin(w.t)*TIP+over*COM_PULL;
+    }
+    if(Math.abs(w.t)>FALL_T){w.fallen=true; w.fallTimer=9999; w.vx=Math.sign(w.t)*2; return;}
+  }
+
+  // --- leg limits: no spinning ---
+  for(const l of w.legs){
+    l.a=Math.max(-MAXA,Math.min(MAXA,l.a));
+    l.a=Math.max(-MAXW-w.t,Math.min(MAXW-w.t,l.a));
+  }
+
+  // --- horizontal: planted feet hold the ground. On ice they slip and you slide. ---
+  const planted=w.legs.filter(l=>l.planted);
+  if(planted.length){
+    const cands=planted.map(l=>l.fx-l.off*Math.cos(w.t)-l.len*Math.sin(ang(w,l)));
+    const nx=cands.reduce((s,v)=>s+v,0)/cands.length;
+    const delta=nx-w.hx;
+    if(planted.every(l=>iceAt(l.fx))){
+      w.vx=w.vx*0.975+delta*0.08;
+      w.hx+=w.vx;
+      for(const l of planted) l.fx=footX(w,l);
+    } else {
+      w.vx=delta; w.hx=nx;
+    }
+  } else {
+    w.hx+=w.vx;
+  }
+
+  // --- vertical ---
+  let maxHy=Infinity;
+  for(const l of w.legs){
+    const G=groundAt(footX(w,l));
+    if(G!==null) maxHy=Math.min(maxHy,G-l.off*Math.sin(w.t)-l.len*Math.cos(ang(w,l)));
+  }
+  w.vy+=GRAVITY; w.hy+=w.vy;
+  if(w.hy>=maxHy){w.hy=maxHy; w.vy=0;}
+
+  for(const l of w.legs){
+    const x=footX(w,l), G=groundAt(x);
+    const on=G!==null && Math.abs(footY(w,l)-G)<0.5;
+    if(on&&!l.planted) l.fx=x;
+    l.planted=on;
+    if(on){const p=platAt(x); if(p&&p.crumble&&p.timer===null) p.timer=70;}
+  }
+
+  if(w.legs[0].planted && w.legs[1].planted){
+    const G=groundAt(w.hx);
+    if(G!==null) w.cp={x:w.hx,y:G};
+  }
+
+  if(w.hy>LAVA_Y) respawn(w);
+}
+
+// when one walker goes down, the rope yanks the other one over too
+function knockDown(victim,source){
+  const dir=Math.sign(source.hx-victim.hx)||1;
+  victim.fallen=true;
+  victim.fallTimer=victim.isBot?FALL_FRAMES:9999;
+  victim.t=dir*(FALL_T+0.1);
+  victim.vx=dir*6;
+}
+
+function applyRope(){
+  if(!botOn) return;
+  const anyFallen=player.fallen||bot.fallen;
+  const ropeLen=anyFallen?90:ROPE;
+  const grip=anyFallen?0.4:0.25;
+  const d=bot.hx-player.hx, dist=Math.abs(d);
+  if(dist<=ropeLen) return;
+  const pull=(dist-ropeLen)*grip*Math.sign(d);
+  for(const [w,s] of [[player,pull],[bot,-pull]]){
+    w.hx+=s;
+    for(const l of w.legs) if(l.planted) l.fx+=s;
+  }
+}
+
+function step(){
+  if(won) return;
+  const pFell=player.fallen, bFell=bot.fallen;
+  stepWalker(player);
+  if(botOn) stepWalker(bot);
+  if(botOn){
+    if(player.fallen && !pFell && !bot.fallen) knockDown(bot,player);
+    if(bot.fallen && !bFell && !player.fallen) knockDown(player,bot);
+  }
+  applyRope();
+
+  for(const p of platforms){
+    if(p.timer!==null && !p.gone){ p.timer--; if(p.timer<=0) p.gone=true; }
+  }
+
+  if(player.hx>GOAL){
+    won=true; inProgress=false;
+    finalTime=(performance.now()-startTime)/1000;
+    if(!bests[lvl]||finalTime<bests[lvl]){
+      bests[lvl]=finalTime;
+      try{localStorage.setItem('legsBests',JSON.stringify(bests));}catch(e){}
+    }
+    screen='win'; showPage('win');
+  }
+}
+
+// ---------- drawing (2.5D: blocks have a top and a side receding into the screen) ----------
+function drawBackground(){
+  const gr=g.createLinearGradient(0,0,0,500);
+  gr.addColorStop(0,'#0d0d24'); gr.addColorStop(1,'#2a2050');
+  g.fillStyle=gr; g.fillRect(0,0,1000,500);
+  const layers=[[0.12,'#1a1a3a',170,240,440],[0.3,'#232348',120,170,480]];
+  for(const [par,col,h,w,base] of layers){
+    g.fillStyle=col;
+    const off=-((player.hx*par)%w);
+    for(let x=off-w;x<1000+w;x+=w){
+      const i=Math.round((x+player.hx*par)/w);
+      const hh=h*(0.65+0.35*Math.abs(Math.sin(i*1.7)));
+      g.beginPath(); g.moveTo(x,500); g.lineTo(x+w/2,base-hh); g.lineTo(x+w,500); g.fill();
+    }
+  }
+}
+
+function drawPlatform(p){
+  if(p.gone) return;
+  let front='#3a3a4a', top='#5a5a6e', side='#2a2a38';
+  if(p.ice){front='#4d7a99'; top='#a8dcf5'; side='#3a5f78';}
+  if(p.crumble){front='#6b4a2e'; top='#9a6f45'; side='#4a3220';}
+  let sx=0;
+  if(p.timer!==null && screen==='play') sx=(Math.random()-0.5)*4;
+  const w=p.x2-p.x1;
+  g.save(); g.translate(sx,0);
+  g.fillStyle=side;
+  g.beginPath(); g.moveTo(p.x2,p.y); g.lineTo(p.x2+DX,p.y+DY); g.lineTo(p.x2+DX,p.y+DY+200); g.lineTo(p.x2,p.y+200); g.fill();
+  g.fillStyle=front; g.fillRect(p.x1,p.y,w,200);
+  g.fillStyle=top;
+  g.beginPath(); g.moveTo(p.x1,p.y); g.lineTo(p.x2,p.y); g.lineTo(p.x2+DX,p.y+DY); g.lineTo(p.x1+DX,p.y+DY); g.fill();
+  if(DX===0){ g.fillStyle=top; g.fillRect(p.x1,p.y,w,4); } // flat look still gets a lit edge
+  if(p.ice){
+    g.strokeStyle='#ffffff55'; g.lineWidth=2;
+    for(let x=p.x1+20;x<p.x2;x+=40){g.beginPath(); g.moveTo(x,p.y+DY/2+3); g.lineTo(x+14+DX/2,p.y+DY/2-3); g.stroke();}
+  }
+  if(p.crumble){
+    g.strokeStyle='#2a1a10'; g.lineWidth=2;
+    for(let x=p.x1+15;x<p.x2;x+=35){g.beginPath(); g.moveTo(x,p.y); g.lineTo(x+6,p.y+14); g.lineTo(x-2,p.y+26); g.stroke();}
+  }
+  g.restore();
+}
+
+function drawWalker(w){
+  g.save();
+  g.translate(DX/2,DY/2);
+  g.lineCap='round';
+  for(const l of w.legs){
+    g.lineWidth=10;
+    g.strokeStyle=l.planted?'#ffb04a':'#e87830';
+    g.beginPath(); g.moveTo(hipX(w,l),hipY(w,l)); g.lineTo(footX(w,l),footY(w,l)); g.stroke();
+    g.fillStyle=l.planted?'#fff':'#ddd';
+    g.beginPath(); g.arc(footX(w,l),footY(w,l),6,0,Math.PI*2); g.fill();
+  }
+  g.translate(w.hx,w.hy);
+  g.rotate(w.t);
+  g.fillStyle=w.color; g.fillRect(-20,-60,40,60);
+  g.fillStyle='#fff8'; g.beginPath(); g.arc(0,-74,13,0,Math.PI*2); g.fill();
+  g.fillStyle='#124'; g.beginPath(); g.arc(5,-76,3,0,Math.PI*2); g.fill();
+  g.restore();
+}
+
+function draw(){
+  camY+=(player.hy-camY)*0.08;
+  drawBackground();
+  g.save();
+  g.translate(500-player.hx,330-camY);
+
+  g.fillStyle='#d2380f'; g.fillRect(player.hx-700,LAVA_Y,1400,400);
+  g.fillStyle='#ff7a1a'; g.fillRect(player.hx-700,LAVA_Y,1400,6);
+
+  for(const p of platforms) drawPlatform(p);
+
+  g.fillStyle='#4f8'; g.fillRect(player.cp.x-2+DX/2,player.cp.y-30+DY/2,4,30);
+  const gp=platforms.find(p=>GOAL>=p.x1&&GOAL<=p.x2), gy=gp?gp.y:400;
+  g.fillStyle='#ccc'; g.fillRect(GOAL,gy-130,4,130);
+  g.fillStyle='gold'; g.fillRect(GOAL+4,gy-130,40,26);
+
+  if(botOn){
+    const ax=player.hx+DX/2, ay=player.hy-30+DY/2, bx=bot.hx+DX/2, by=bot.hy-30+DY/2;
+    const slack=Math.max(0,ROPE-Math.abs(bx-ax));
+    g.strokeStyle='#c9a66b'; g.lineWidth=4;
+    g.beginPath(); g.moveTo(ax,ay);
+    g.quadraticCurveTo((ax+bx)/2,(ay+by)/2+slack*0.5,bx,by);
+    g.stroke();
+    drawWalker(bot);
+  }
+  drawWalker(player);
+  g.restore();
+
+  const name=`${lvl+1}. ${LEVELS[lvl].name}`;
+  let s=0;
+  if(won) s=finalTime; else if(started && screen==='play') s=(performance.now()-startTime)/1000;
+  else if(started) s=(pausedAt-startTime)/1000;
+  const b=bests[lvl];
+  if(player.fallen) timeEl.textContent=`${name} | You fell over! Press R`;
+  else timeEl.textContent=`${name} | ${s.toFixed(2)}s${b?`  (best ${b.toFixed(2)}s)`:''}${botOn?'':'  (bot off)'}`;
+}
+
+// ---------- menus ----------
+const fmt=t=>t.toFixed(2)+'s';
+function setScreen(s){
+  screen=s;
+  menuEl.style.display=(s==='play')?'none':'flex';
+}
+function showPage(p){
+  setScreen(p);
+  let h='';
+  if(p==='main'){
+    h=`<h1>LEGS</h1>
+       <p>Two legs. Zero balance. Roped to a partner.</p>
+       <button class="big" onclick="${inProgress?'resume()':'startLevel(lvl)'}">${inProgress?'Resume':'Play'}</button>
+       <button class="big" onclick="showPage('levels')">Level Select</button>
+       <button class="big" onclick="showPage('settings')">Settings</button>
+       <p style="font-size:13px;margin-top:8px">Esc opens this menu. Two players can share one body: WASD for the left leg, arrows for the right.</p>`;
+  } else if(p==='levels'){
+    h=`<h2>Level Select</h2><div class="grid">`+LEVELS.map((lv,i)=>
+      `<button class="card" onclick="startLevel(${i})"><b>${i+1}. ${lv.name}</b>${lv.desc}<br><small>${bests[i]?'Best '+fmt(bests[i]):'No time yet'}</small></button>`
+    ).join('')+`</div><button onclick="showPage('main')">Back</button>`;
+  } else if(p==='settings'){
+    const opt=(key,val,label)=>`<button class="${settings[key]===val?'on':''}" onclick="setSetting('${key}',${JSON.stringify(val)})">${label}</button>`;
+    h=`<h2>Settings</h2>
+       <div class="row"><span>Difficulty</span>${opt('diff','easy','Easy')}${opt('diff','normal','Normal')}${opt('diff','hard','Hard')}</div>
+       <div class="row"><span>Bot partner</span>${opt('bot',true,'On')}${opt('bot',false,'Off')}</div>
+       <div class="row"><span>2.5D depth</span>${opt('depth',true,'On')}${opt('depth',false,'Flat')}</div>
+       <div class="row"><span>Controls bar</span>${opt('hints',true,'Show')}${opt('hints',false,'Hide')}</div>
+       <p style="font-size:13px">Difficulty changes how easily gravity tips you over. Takes effect right away.</p>
+       <button onclick="showPage('main')">Back</button>`;
+  } else if(p==='win'){
+    const next=lvl+1<LEVELS.length;
+    h=`<h2>Level complete!</h2>
+       <p style="font-size:22px">${LEVELS[lvl].name}: <b>${fmt(finalTime)}</b></p>
+       <p>Best: ${fmt(bests[lvl])}</p>
+       ${next?`<button class="big" onclick="startLevel(${lvl+1})">Next Level</button>`:''}
+       <button class="big" onclick="startLevel(${lvl})">Retry</button>
+       <button class="big" onclick="showPage('levels')">Level Select</button>
+       <button class="big" onclick="showPage('main')">Main Menu</button>`;
+  }
+  menuEl.innerHTML=h;
+}
+function setSetting(k,v){settings[k]=v; applySettings(); showPage('settings');}
+function startLevel(i){
+  loadLevel(i);
+  inProgress=true;
+  setScreen('play');
+}
+function openMenu(p){
+  if(started && !won) pausedAt=performance.now();
+  for(const k in keys) keys[k]=false;
+  showPage(p);
+}
+function resume(){
+  if(started && !won) startTime+=performance.now()-pausedAt;
+  setScreen('play');
+}
+
+// ---------- boot ----------
+applySettings();
+loadLevel(0);
+showPage('main');
+function loop(){ if(screen==='play') step(); draw(); requestAnimationFrame(loop); }
+loop();
+</script>
+</body>
+</html>
